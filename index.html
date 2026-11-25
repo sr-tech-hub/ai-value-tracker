@@ -1,0 +1,627 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Value Tracker</title>
+<meta name="description" content="Is our AI spend paying off? Utilization, waste, hours saved and ROI for AI tool licences. Built with sample data.">
+<style>
+  :root {
+    --bg: #07090d;
+    --panel: #0e131a;
+    --panel-2: #141b24;
+    --border: #1f2935;
+    --text: #e6edf3;
+    --muted: #8a97a6;
+    --cyan: #22d3ee;
+    --amber: #fbbf24;
+    --green: #34d399;
+    --purple: #a78bfa;
+    --red: #f87171;
+    --radius: 12px;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 16px 56px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: flex-end; justify-content: space-between; margin-bottom: 22px; }
+  .eyebrow { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--cyan); font-weight: 600; }
+  h1 { margin: 4px 0 2px; font-size: clamp(24px, 4vw, 32px); line-height: 1.15; }
+  .sub { color: var(--muted); margin: 0; }
+  .sample-note {
+    border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+    background: color-mix(in srgb, var(--amber) 10%, transparent);
+    color: var(--amber); border-radius: 999px; padding: 6px 14px; font-size: 13px;
+  }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  @media (max-width: 420px) {
+    .card { padding: 12px; }
+    .card .value { font-size: 24px; }
+  }
+  .card { background: var(--panel); border: 1px solid var(--border); border-top: 3px solid var(--accent, var(--cyan)); border-radius: var(--radius); padding: 14px 16px; }
+  .card .label { color: var(--muted); font-size: 13px; }
+  .card .value { font-size: 28px; font-weight: 700; margin: 2px 0; font-variant-numeric: tabular-nums; }
+  .card .hint { color: var(--muted); font-size: 12.5px; }
+
+  .grid { display: grid; gap: 16px; margin-bottom: 16px; }
+  @media (min-width: 900px) {
+    .grid.two { grid-template-columns: 1.4fr 1fr; }
+    .grid.two-even { grid-template-columns: 1fr 1fr; }
+  }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; min-width: 0; }
+  .panel h2 { margin: 0 0 4px; font-size: 18px; }
+  .panel .lead { color: var(--muted); margin: 0 0 14px; font-size: 13.5px; }
+  .tag-title { display: inline-block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+
+  .recs { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .recs li { background: var(--panel-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 8px; padding: 10px 12px; }
+  .recs .kind { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--accent); }
+  .recs p { margin: 2px 0 0; }
+
+  .assumptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .field .input-wrap { display: flex; align-items: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 0 10px; }
+  .field .input-wrap:focus-within { border-color: var(--cyan); }
+  .field input { width: 100%; min-width: 0; background: transparent; border: 0; color: var(--text); font: inherit; font-size: 16px; padding: 8px 4px; outline: none; font-variant-numeric: tabular-nums; }
+  .field .unit { color: var(--muted); font-size: 13px; white-space: nowrap; }
+  .field.rate { grid-column: 1 / -1; max-width: 260px; }
+  .actions { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  button.reset { background: transparent; color: var(--cyan); border: 1px solid color-mix(in srgb, var(--cyan) 50%, transparent); border-radius: 8px; padding: 7px 14px; font: inherit; cursor: pointer; }
+  button.reset:hover { background: color-mix(in srgb, var(--cyan) 12%, transparent); }
+  .small { color: var(--muted); font-size: 12.5px; }
+
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+  th button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+  th button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 3px; }
+  th[aria-sort] button { color: var(--text); }
+  .arrow { font-size: 10px; width: 10px; display: inline-block; }
+  tbody tr:hover { background: var(--panel-2); }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .warn { color: var(--amber); }
+  .meter { display: inline-block; width: 54px; height: 6px; border-radius: 3px; background: var(--border); margin-left: 8px; vertical-align: middle; overflow: hidden; }
+  .meter span { display: block; height: 100%; background: var(--cyan); }
+
+  .waste-total { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-bottom: 12px; }
+  .waste-total strong { font-size: 22px; color: var(--amber); font-variant-numeric: tabular-nums; }
+  details { margin-top: 12px; }
+  summary { cursor: pointer; color: var(--cyan); }
+  details table { margin-top: 8px; font-size: 13px; }
+
+  .chart-title { font-size: 13px; color: var(--muted); margin: 16px 0 6px; }
+  .chart svg { display: block; }
+  .chart text { font: 12.5px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--text); }
+  .chart text.v { fill: var(--muted); }
+
+  dl.defs { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 8px 18px; margin: 0; }
+  dl.defs dt { font-weight: 600; color: var(--cyan); }
+  dl.defs dd { margin: 0; }
+  @media (max-width: 560px) {
+    dl.defs { grid-template-columns: 1fr; gap: 2px; }
+    dl.defs dd { margin-bottom: 8px; }
+  }
+  footer { color: var(--muted); font-size: 13px; margin-top: 24px; text-align: center; }
+
+  .load-error { display: none; max-width: 620px; margin: 60px auto; }
+  .load-error code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">AI Value Tracker</div>
+      <h1>Is our AI spend paying off?</h1>
+      <p class="sub" id="subtitle">Loading…</p>
+    </div>
+    <div class="sample-note">Built with sample data to protect confidentiality.</div>
+  </header>
+
+  <div class="panel load-error" id="load-error" role="alert">
+    <h2>The usage data couldn't load</h2>
+    <p>Browsers block a page opened straight from your files from reading <code>data/sample-usage.json</code>.</p>
+    <p>View the live demo instead, or serve this folder locally, for example with <code>python3 -m http.server</code>, then open the address it prints.</p>
+  </div>
+
+  <main id="app" hidden>
+    <section class="cards" id="headline" aria-label="Headline numbers"></section>
+
+    <div class="grid two">
+      <section class="panel" aria-labelledby="recs-h">
+        <span class="tag-title" style="color:var(--green)">Actions</span>
+        <h2 id="recs-h">Recommendations</h2>
+        <p class="lead">Generated from the data and your assumptions. They update when you change the numbers.</p>
+        <ul class="recs" id="recs"></ul>
+      </section>
+
+      <section class="panel" aria-labelledby="assume-h">
+        <span class="tag-title" style="color:var(--cyan)">Estimates</span>
+        <h2 id="assume-h">Assumptions</h2>
+        <p class="lead">These are estimates, not measurements. Change them and every number on the page recalculates.</p>
+        <form class="assumptions" id="assumptions" onsubmit="return false"></form>
+        <div class="actions">
+          <button type="button" class="reset" id="reset">Reset to defaults</button>
+          <span class="small">Loaded hourly rate = salary plus overhead, per hour.</span>
+        </div>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="teams-h" style="margin-bottom:16px">
+      <span class="tag-title" style="color:var(--purple)">Breakdown</span>
+      <h2 id="teams-h">By team</h2>
+      <p class="lead">Click a column heading to sort.</p>
+      <div class="table-scroll">
+        <table id="teams-table">
+          <thead><tr id="teams-head"></tr></thead>
+          <tbody id="teams-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid two-even">
+      <section class="panel" aria-labelledby="waste-h">
+        <span class="tag-title" style="color:var(--amber)">Savings</span>
+        <h2 id="waste-h">Waste finder</h2>
+        <p class="lead">Seats with no activity for 30+ days, and what reclaiming them would save.</p>
+        <div id="waste"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="tools-h">
+        <span class="tag-title" style="color:var(--cyan)">Compare</span>
+        <h2 id="tools-h">By tool</h2>
+        <p class="lead">Seat prices are SAMPLE values, not real vendor pricing. Overlap = active users who also actively use another general assistant.</p>
+        <div class="table-scroll"><table id="tools-table"></table></div>
+        <div class="chart-title">Cost per active user, per month</div>
+        <div class="chart" id="chart-cost"></div>
+        <div class="chart-title">Hours saved per active user, per month</div>
+        <div class="chart" id="chart-hours"></div>
+      </section>
+    </div>
+
+    <section class="panel" aria-labelledby="measure-h">
+      <span class="tag-title" style="color:var(--purple)">Method</span>
+      <h2 id="measure-h">How we measure</h2>
+      <p class="lead" id="measure-lead"></p>
+      <dl class="defs">
+        <dt>Paid seat</dt><dd>A licence the company pays for.</dd>
+        <dt>Active seat</dt><dd>A seat used at least once in the last 30 days.</dd>
+        <dt>Utilization</dt><dd>Active seats ÷ paid seats.</dd>
+        <dt>Hours saved</dt><dd>Tasks completed with AI × minutes saved per task type ÷ 60.</dd>
+        <dt>Estimated value</dt><dd>Hours saved × loaded hourly rate (salary plus overhead, per hour).</dd>
+        <dt>ROI</dt><dd>(Estimated value − cost) ÷ cost.</dd>
+      </dl>
+    </section>
+  </main>
+
+  <footer id="footer">Built with sample data to protect confidentiality. Maplebridge Labs is a fictional company.</footer>
+</div>
+
+<script>
+'use strict';
+
+// Starting estimates, deliberately cautious so the ROI figures stay believable.
+const DEFAULT_ASSUMPTIONS = {
+  hourlyRate: 50,
+  minutes: { writing: 8, summarizing: 5, coding: 10, research: 10, supportReplies: 4 },
+};
+const TASK_LABELS = {
+  writing: 'Writing', summarizing: 'Summarizing', coding: 'Coding',
+  research: 'Research', supportReplies: 'Support replies',
+};
+const ACTIVE_WINDOW_DAYS = 30;
+const MIN_GROUP_TO_RECLAIM = 3;   // smaller unused groups are rolled into one "review" item
+const OVERLAP_SHARE_TO_RETIRE = 0.5;
+const OVERLAP_PEOPLE_TO_FLAG = 10;
+
+let DATA = null;
+let assumptions = structuredClone(DEFAULT_ASSUMPTIONS);
+let teamSort = { key: 'roi', dir: -1 };
+
+const money = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
+const num = (v) => new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(v);
+const pct = (v) => (Number.isFinite(v) ? `${num(v * 100)}%` : '—');
+const sum = (list, fn = (x) => x) => list.reduce((s, x) => s + fn(x), 0);
+const daysBetween = (fromIso, toIso) => Math.round((Date.parse(toIso) - Date.parse(fromIso)) / 86400000);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const roiClass = (v) => (v < 0 ? 'neg' : 'pos');
+const monthName = (ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const longDate = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+
+function joinWords(list) {
+  return list.length < 2 ? list.join('') : `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
+// ---------------------------------------------------------------------------
+// The calculator. Every number on the page comes from this one function, so
+// the headline, team and tool views can never disagree with each other.
+// ---------------------------------------------------------------------------
+function calculate(data, a) {
+  const asOf = data.meta.asOf;
+  const month = data.meta.months[data.meta.months.length - 1];
+  const toolInfo = Object.fromEntries(data.tools.map((t) => [t.id, t]));
+
+  const group = (extra) => ({ ...extra, paid: 0, active: 0, cost: 0, hours: 0, unused: [], taskHours: {} });
+  const total = group({});
+  const teams = new Map(data.teams.map((t) => [t.name, group({ name: t.name, headcount: t.headcount })]));
+  const tools = new Map(data.tools.map((t) => [t.id, group({ id: t.id, name: t.name, price: t.monthlyPricePerSeat, category: t.category })]));
+  const seatsByPerson = new Map();
+
+  for (const s of data.seats) {
+    const tool = toolInfo[s.tool];
+    const idleDays = s.lastActive ? daysBetween(s.lastActive, asOf) : null;
+    const active = idleDays !== null && idleDays < ACTIVE_WINDOW_DAYS;
+    const tasks = s.usage.find((u) => u.month === month)?.tasks ?? {};
+
+    const taskHours = {};
+    for (const [type, count] of Object.entries(tasks)) taskHours[type] = (count * (a.minutes[type] ?? 0)) / 60;
+    const hours = sum(Object.values(taskHours));
+    const seat = { ...s, toolName: tool.name, category: tool.category, price: tool.monthlyPricePerSeat, idleDays, active, hours };
+
+    for (const g of [total, teams.get(s.team), tools.get(s.tool)]) {
+      g.paid += 1;
+      g.cost += seat.price;
+      g.hours += hours;
+      if (active) g.active += 1; else g.unused.push(seat);
+      for (const [type, h] of Object.entries(taskHours)) g.taskHours[type] = (g.taskHours[type] ?? 0) + h;
+    }
+    if (!seatsByPerson.has(s.employeeId)) seatsByPerson.set(s.employeeId, []);
+    seatsByPerson.get(s.employeeId).push(seat);
+  }
+
+  const finish = (g) => {
+    g.value = g.hours * a.hourlyRate;
+    g.roi = g.cost ? (g.value - g.cost) / g.cost : NaN;
+    g.utilization = g.paid ? g.active / g.paid : NaN;
+    g.unusedCost = sum(g.unused, (s) => s.price);
+    g.costPerActive = g.active ? g.cost / g.active : NaN;
+    g.hoursPerActive = g.active ? g.hours / g.active : NaN;
+    return g;
+  };
+  finish(total);
+  teams.forEach(finish);
+  tools.forEach(finish);
+
+  // Overlap: one person actively using two general-purpose assistants that do
+  // the same job. Unused seats are left out because the waste finder already
+  // counts them; including them here would claim the same savings twice.
+  const pairs = new Map();
+  tools.forEach((t) => { t.overlapPeople = 0; });
+  for (const owned of seatsByPerson.values()) {
+    const assistants = owned.filter((s) => s.category === 'assistant' && s.active);
+    if (assistants.length < 2) continue;
+    for (const s of assistants) tools.get(s.tool).overlapPeople += 1;
+    for (let i = 0; i < assistants.length; i++) {
+      for (let j = i + 1; j < assistants.length; j++) {
+        const [x, y] = [assistants[i], assistants[j]].sort((p, q) => p.tool.localeCompare(q.tool));
+        const key = `${x.tool}+${y.tool}`;
+        if (!pairs.has(key)) pairs.set(key, { tools: [x.tool, y.tool], people: [] });
+        pairs.get(key).people.push([x, y]);
+      }
+    }
+  }
+
+  return { month, total, teams: [...teams.values()], tools: [...tools.values()], pairs: [...pairs.values()] };
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations: plain-English rules applied to the calculator's output.
+// ---------------------------------------------------------------------------
+function unusedGroups(unused) {
+  const groups = new Map();
+  for (const s of unused) {
+    const key = `${s.team}|${s.tool}`;
+    if (!groups.has(key)) groups.set(key, { team: s.team, toolName: s.toolName, seats: [] });
+    groups.get(key).seats.push(s);
+  }
+  return [...groups.values()]
+    .map((g) => ({ ...g, savings: sum(g.seats, (s) => s.price) }))
+    .sort((p, q) => q.savings - p.savings || p.team.localeCompare(q.team));
+}
+
+function topTaskTypes(g, n) {
+  return Object.entries(g.taskHours)
+    .filter(([, h]) => h > 0)
+    .sort((p, q) => q[1] - p[1])
+    .slice(0, n)
+    .map(([type]) => TASK_LABELS[type].toLowerCase());
+}
+
+function buildRecommendations(r) {
+  const recs = [];
+  const toolById = Object.fromEntries(r.tools.map((t) => [t.id, t]));
+
+  const groups = unusedGroups(r.total.unused);
+  const big = groups.filter((g) => g.seats.length >= MIN_GROUP_TO_RECLAIM);
+  const small = groups.filter((g) => g.seats.length < MIN_GROUP_TO_RECLAIM);
+  for (const g of big) {
+    recs.push({ kind: 'Reclaim', color: 'var(--amber)', html:
+      `Reclaim <strong>${g.seats.length} unused ${esc(g.toolName)} seats in ${esc(g.team)}</strong> → save <strong>${money(g.savings)}/month</strong> (${money(g.savings * 12)}/year).` });
+  }
+  if (small.length) {
+    const n = sum(small, (g) => g.seats.length);
+    const teamCount = new Set(small.map((g) => g.team)).size;
+    recs.push({ kind: 'Reclaim', color: 'var(--amber)', html:
+      `Review the other <strong>${n} unused seats</strong> spread across ${teamCount} team${teamCount === 1 ? '' : 's'} → up to <strong>${money(sum(small, (g) => g.savings))}/month</strong>.` });
+  }
+
+  // The assistant most often held alongside another assistant is the retirement candidate.
+  const dup = r.tools
+    .filter((t) => t.category === 'assistant' && t.active)
+    .map((t) => ({ t, share: t.overlapPeople / t.active }))
+    .sort((p, q) => q.share - p.share)[0];
+  let retiredPair = null;
+  if (dup && dup.share >= OVERLAP_SHARE_TO_RETIRE) {
+    retiredPair = r.pairs.filter((p) => p.tools.includes(dup.t.id)).sort((p, q) => q.people.length - p.people.length)[0];
+    const partner = toolById[retiredPair.tools.find((id) => id !== dup.t.id)];
+    const n = retiredPair.people.length;
+    recs.push({ kind: 'Consolidate', color: 'var(--purple)', html:
+      `<strong>${n} of ${dup.t.active} active ${esc(dup.t.name)} users also use ${esc(partner.name)}.</strong> Move them to ${esc(partner.name)} and retire their ${esc(dup.t.name)} seats → save <strong>${money(n * dup.t.price)}/month</strong>.` });
+  }
+  for (const p of r.pairs) {
+    if (p === retiredPair || p.people.length < OVERLAP_PEOPLE_TO_FLAG) continue;
+    // For each person, dropping whichever seat they used less loses the least value.
+    const savings = sum(p.people, ([x, y]) => (x.hours <= y.hours ? x.price : y.price));
+    const [nameA, nameB] = p.tools.map((id) => esc(toolById[id].name));
+    recs.push({ kind: 'Consolidate', color: 'var(--purple)', html:
+      `<strong>${p.people.length} people pay for both ${nameA} and ${nameB}.</strong> Check whether they need both; dropping each person's less-used seat would save <strong>${money(savings)}/month</strong>.` });
+  }
+
+  for (const t of r.teams.filter((g) => g.roi < 0).sort((p, q) => p.roi - q.roi)) {
+    const activeCost = t.cost - t.unusedCost;
+    const roiIfReclaimed = activeCost ? (t.value - activeCost) / activeCost : NaN;
+    const fix = roiIfReclaimed < 0
+      ? `Even with unused seats reclaimed, ROI would be ${pct(roiIfReclaimed)}, so run hands-on training on real ${esc(t.name)} tasks before renewing.`
+      : `Reclaiming its unused seats would lift ROI to ${pct(roiIfReclaimed)}.`;
+    recs.push({ kind: 'Improve', color: 'var(--red)', html:
+      `<strong>${esc(t.name)} spends ${money(t.cost)}/month on AI but gets back an estimated ${money(t.value)}</strong> (ROI <span class="neg">${pct(t.roi)}</span>). ${fix}` });
+  }
+
+  const best = r.teams.filter((g) => g.paid).sort((p, q) => q.roi - p.roi)[0];
+  if (best && best.roi > 0) {
+    const uses = topTaskTypes(best, 2);
+    recs.push({ kind: 'Replicate', color: 'var(--green)', html:
+      `<strong>${esc(best.name)} gets the most value per dollar</strong> (ROI <span class="pos">${pct(best.roi)}</span>)${uses.length ? `, mostly from ${joinWords(uses)}` : ''}. Use its workflows as the playbook for other teams.` });
+  }
+  return recs;
+}
+
+// ---------------------------------------------------------------------------
+// Rendering
+// ---------------------------------------------------------------------------
+function renderHeadline(r) {
+  const t = r.total;
+  const cards = [
+    { label: 'Monthly AI spend', value: money(t.cost), hint: `${t.paid} paid seats, ${r.tools.length} tools`, accent: 'var(--cyan)' },
+    { label: 'Utilization', value: pct(t.utilization), hint: `${t.active} of ${t.paid} seats active`, accent: 'var(--purple)' },
+    { label: 'Hours saved / month', value: num(t.hours), hint: `${monthName(r.month)} usage`, accent: 'var(--green)' },
+    { label: 'Estimated value / month', value: money(t.value), hint: `at ${money(assumptions.hourlyRate)}/hour`, accent: 'var(--amber)' },
+    { label: 'ROI', value: `<span class="${roiClass(t.roi)}">${pct(t.roi)}</span>`, hint: 'value vs spend', accent: t.roi < 0 ? 'var(--red)' : 'var(--green)' },
+  ];
+  document.getElementById('headline').innerHTML = cards.map((c) => `
+    <div class="card" style="--accent:${c.accent}">
+      <div class="label">${c.label}</div>
+      <div class="value">${c.value}</div>
+      <div class="hint">${c.hint}</div>
+    </div>`).join('');
+}
+
+const TEAM_COLUMNS = [
+  { key: 'name', label: 'Team' },
+  { key: 'paid', label: 'Paid seats' },
+  { key: 'cost', label: 'Spend / mo' },
+  { key: 'utilization', label: 'Utilization' },
+  { key: 'hours', label: 'Hours saved / mo' },
+  { key: 'value', label: 'Value / mo' },
+  { key: 'roi', label: 'ROI' },
+];
+
+function renderTeams(r) {
+  document.getElementById('teams-head').innerHTML = TEAM_COLUMNS.map((c) => {
+    const sorted = teamSort.key === c.key;
+    const aria = sorted ? ` aria-sort="${teamSort.dir === 1 ? 'ascending' : 'descending'}"` : '';
+    const arrow = sorted ? (teamSort.dir === 1 ? '▲' : '▼') : '';
+    return `<th scope="col"${aria}><button type="button" data-key="${c.key}">${c.label}<span class="arrow">${arrow}</span></button></th>`;
+  }).join('');
+
+  const rows = [...r.teams].sort((p, q) => {
+    const a = p[teamSort.key];
+    const b = q[teamSort.key];
+    const cmp = typeof a === 'string' ? a.localeCompare(b) : a - b;
+    return cmp * teamSort.dir;
+  });
+  document.getElementById('teams-body').innerHTML = rows.map((t) => `
+    <tr>
+      <td>${esc(t.name)}</td>
+      <td>${t.paid}</td>
+      <td>${money(t.cost)}</td>
+      <td class="${t.utilization < 0.75 ? 'warn' : ''}">${pct(t.utilization)}<span class="meter" aria-hidden="true"><span style="width:${(t.utilization || 0) * 100}%"></span></span></td>
+      <td>${num(t.hours)}</td>
+      <td>${money(t.value)}</td>
+      <td class="${roiClass(t.roi)}">${pct(t.roi)}</td>
+    </tr>`).join('');
+}
+
+function renderWaste(r) {
+  const t = r.total;
+  const groups = unusedGroups(t.unused);
+  const seats = [...t.unused].sort((p, q) => (q.idleDays ?? Infinity) - (p.idleDays ?? Infinity) || p.seatId.localeCompare(q.seatId));
+  document.getElementById('waste').innerHTML = `
+    <div class="waste-total">
+      <div><strong>${t.unused.length}</strong> unused seats</div>
+      <div><strong>${money(t.unusedCost)}</strong> / month</div>
+      <div><strong>${money(t.unusedCost * 12)}</strong> / year</div>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th scope="col">Team</th><th scope="col">Tool</th><th scope="col">Unused seats</th><th scope="col">Savings / mo</th></tr></thead>
+        <tbody>${groups.map((g) => `
+          <tr><td>${esc(g.team)}</td><td>${esc(g.toolName)}</td><td>${g.seats.length}</td><td class="warn">${money(g.savings)}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <details>
+      <summary>Show all ${seats.length} seats</summary>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th scope="col">Seat</th><th scope="col">Employee</th><th scope="col">Team</th><th scope="col">Tool</th><th scope="col">Last active</th></tr></thead>
+          <tbody>${seats.map((s) => `
+            <tr><td>${esc(s.seatId)}</td><td>${esc(s.employeeId)}</td><td>${esc(s.team)}</td><td>${esc(s.toolName)}</td>
+            <td>${s.lastActive ? `${longDate(s.lastActive)} <span class="small">(${s.idleDays} days)</span>` : '<span class="warn">Never</span>'}</td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    </details>`;
+}
+
+function renderTools(r) {
+  const tools = [...r.tools].sort((p, q) => q.paid - p.paid);
+  document.getElementById('tools-table').innerHTML = `
+    <thead><tr>
+      <th scope="col">Tool</th><th scope="col">Price / seat</th><th scope="col">Paid</th><th scope="col">Active</th>
+      <th scope="col">Utilization</th><th scope="col">Overlap</th>
+    </tr></thead>
+    <tbody>${tools.map((t) => `
+      <tr>
+        <td>${esc(t.name)}</td>
+        <td>${money(t.price)} <span class="small">sample</span></td>
+        <td>${t.paid}</td>
+        <td>${t.active}</td>
+        <td class="${t.utilization < 0.75 ? 'warn' : ''}">${pct(t.utilization)}</td>
+        <td>${t.category === 'assistant' && t.active ? `<span class="${t.overlapPeople / t.active >= OVERLAP_SHARE_TO_RETIRE ? 'warn' : ''}">${pct(t.overlapPeople / t.active)}</span>` : '<span class="small">n/a</span>'}</td>
+      </tr>`).join('')}
+    </tbody>`;
+
+  barChart(document.getElementById('chart-cost'), tools.map((t) => ({ label: t.name, value: t.costPerActive, text: money(t.costPerActive) })), 'var(--amber)', 'Cost per active user by tool');
+  barChart(document.getElementById('chart-hours'), tools.map((t) => ({ label: t.name, value: t.hoursPerActive, text: `${t.hoursPerActive.toFixed(1)} h` })), 'var(--green)', 'Hours saved per active user by tool');
+}
+
+// Horizontal bar chart in plain SVG, sized to its container so text stays readable on phones.
+function barChart(el, rows, color, title) {
+  const width = Math.max(260, el.clientWidth || 320);
+  const labelW = 112;
+  const valueW = 64;
+  const rowH = 30;
+  const barH = 14;
+  const plotW = width - labelW - valueW;
+  const max = Math.max(...rows.map((r) => (Number.isFinite(r.value) ? r.value : 0))) || 1;
+  const height = rows.length * rowH;
+  const bars = rows.map((r, i) => {
+    const y = i * rowH;
+    const w = Number.isFinite(r.value) ? Math.max(2, (r.value / max) * plotW) : 0;
+    return `
+      <text x="0" y="${y + rowH / 2 + 4}">${esc(r.label)}</text>
+      <rect x="${labelW}" y="${y + (rowH - barH) / 2}" width="${w}" height="${barH}" rx="3" fill="${color}"></rect>
+      <text class="v" x="${labelW + w + 6}" y="${y + rowH / 2 + 4}">${esc(r.text)}</text>`;
+  }).join('');
+  el.innerHTML = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}">${bars}</svg>`;
+}
+
+function renderRecommendations(r) {
+  document.getElementById('recs').innerHTML = buildRecommendations(r)
+    .map((rec) => `<li style="--accent:${rec.color}"><span class="kind">${rec.kind}</span><p>${rec.html}</p></li>`)
+    .join('');
+}
+
+function render() {
+  const r = calculate(DATA, assumptions);
+  renderHeadline(r);
+  renderRecommendations(r);
+  renderTeams(r);
+  renderWaste(r);
+  renderTools(r);
+}
+
+// ---------------------------------------------------------------------------
+// Assumptions form
+// ---------------------------------------------------------------------------
+function buildAssumptionsForm() {
+  const fields = [
+    `<div class="field rate"><label for="a-rate">Loaded hourly rate</label>
+      <div class="input-wrap"><span class="unit">$</span><input id="a-rate" data-path="hourlyRate" type="number" inputmode="decimal" min="0" step="1"><span class="unit">/ hour</span></div></div>`,
+    ...Object.keys(TASK_LABELS).map((type) => `
+      <div class="field"><label for="a-${type}">${TASK_LABELS[type]}</label>
+        <div class="input-wrap"><input id="a-${type}" data-path="minutes.${type}" type="number" inputmode="decimal" min="0" step="1"><span class="unit">min saved</span></div></div>`),
+  ];
+  const form = document.getElementById('assumptions');
+  form.innerHTML = fields.join('');
+  form.addEventListener('input', (e) => {
+    const input = e.target;
+    const value = Number(input.value);
+    if (input.value === '' || !Number.isFinite(value) || value < 0) return; // keep the last valid number while typing
+    const [key, sub] = input.dataset.path.split('.');
+    if (sub) assumptions[key][sub] = value; else assumptions[key] = value;
+    render();
+  });
+  fillAssumptionInputs();
+}
+
+function fillAssumptionInputs() {
+  document.querySelectorAll('#assumptions input').forEach((input) => {
+    const [key, sub] = input.dataset.path.split('.');
+    input.value = sub ? assumptions[key][sub] : assumptions[key];
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Start-up
+// ---------------------------------------------------------------------------
+function init(data) {
+  DATA = data;
+  const company = data.meta.company;
+  const latest = data.meta.months[data.meta.months.length - 1];
+  document.getElementById('subtitle').textContent = `${company} · as of ${longDate(data.meta.asOf)}`;
+  document.getElementById('measure-lead').textContent =
+    `Hours saved and value use the latest month of data (${monthName(latest)}). "Last 30 days" is counted back from ${longDate(data.meta.asOf)}. ${data.meta.pricingNote}`;
+  document.getElementById('footer').textContent = data.meta.note;
+
+  buildAssumptionsForm();
+  document.getElementById('reset').addEventListener('click', () => {
+    assumptions = structuredClone(DEFAULT_ASSUMPTIONS);
+    fillAssumptionInputs();
+    render();
+  });
+  document.getElementById('teams-head').addEventListener('click', (e) => {
+    const button = e.target.closest('button[data-key]');
+    if (!button) return;
+    const key = button.dataset.key;
+    teamSort = teamSort.key === key ? { key, dir: -teamSort.dir } : { key, dir: key === 'name' ? 1 : -1 };
+    render();
+  });
+
+  document.getElementById('app').hidden = false;
+  render();
+
+  let pending = false;
+  window.addEventListener('resize', () => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; render(); });
+  });
+}
+
+fetch('data/sample-usage.json')
+  .then((res) => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  })
+  .then(init)
+  .catch((err) => {
+    console.error('Could not load data/sample-usage.json:', err);
+    document.getElementById('subtitle').textContent = 'Data unavailable';
+    document.getElementById('load-error').style.display = 'block';
+  });
+</script>
+</body>
+</html>

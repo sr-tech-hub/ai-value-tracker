@@ -1,0 +1,8 @@
+# macOS folder metadata
+.DS_Store
+
+# Private briefing for Claude Code; kept locally, not published
+CLAUDE.md
+
+# Local secrets, if any are ever added
+.env*
