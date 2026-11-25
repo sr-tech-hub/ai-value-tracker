@@ -104,6 +104,11 @@
   .chart svg { display: block; }
   .chart text { font: 12.5px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; fill: var(--text); }
   .chart text.v { fill: var(--muted); }
+  .chart text.roi { font-size: 11.5px; font-weight: 600; }
+  .chart text.roi.pos { fill: var(--green); }
+  .chart text.roi.neg { fill: var(--red); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
 
   dl.defs { display: grid; grid-template-columns: minmax(120px, max-content) 1fr; gap: 8px 18px; margin: 0; }
   dl.defs dt { font-weight: 600; color: var(--cyan); }
@@ -157,6 +162,17 @@
         </div>
       </section>
     </div>
+
+    <section class="panel" aria-labelledby="trend-h" style="margin-bottom:16px">
+      <span class="tag-title" style="color:var(--green)">Trend</span>
+      <h2 id="trend-h">Value vs spend, last 6 months</h2>
+      <p class="lead" id="trend-lead"></p>
+      <div class="legend">
+        <span><i style="background:var(--green)"></i>Estimated value</span>
+        <span><i style="background:var(--amber)"></i>AI spend</span>
+      </div>
+      <div class="chart" id="chart-trend"></div>
+    </section>
 
     <section class="panel" aria-labelledby="teams-h" style="margin-bottom:16px">
       <span class="tag-title" style="color:var(--purple)">Breakdown</span>
@@ -247,9 +263,8 @@ function joinWords(list) {
 // The calculator. Every number on the page comes from this one function, so
 // the headline, team and tool views can never disagree with each other.
 // ---------------------------------------------------------------------------
-function calculate(data, a) {
+function calculate(data, a, month = data.meta.months[data.meta.months.length - 1]) {
   const asOf = data.meta.asOf;
-  const month = data.meta.months[data.meta.months.length - 1];
   const toolInfo = Object.fromEntries(data.tools.map((t) => [t.id, t]));
 
   const group = (extra) => ({ ...extra, paid: 0, active: 0, cost: 0, hours: 0, unused: [], taskHours: {} });
@@ -528,6 +543,58 @@ function barChart(el, rows, color, title) {
   el.innerHTML = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(title)}">${bars}</svg>`;
 }
 
+// Re-runs the same calculator once per month, so the trend always agrees with
+// the headline cards and reacts to the assumptions like everything else.
+function renderTrend() {
+  const points = DATA.meta.months.map((m) => ({ month: m, ...calculate(DATA, assumptions, m).total }));
+  const first = points[0];
+  const last = points[points.length - 1];
+  const short = (ym) => new Date(`${ym}-01T00:00:00Z`).toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+  const growth = first.value ? (last.value - first.value) / first.value : NaN;
+
+  document.getElementById('trend-lead').innerHTML =
+    `Estimated value ${growth >= 0 ? 'grew' : 'fell'} <strong class="${roiClass(growth)}">${pct(Math.abs(growth))}</strong> from ${short(first.month)} to ${short(last.month)} while spend held at ${money(last.cost)}/month. ` +
+    `ROI moved from ${pct(first.roi)} to ${pct(last.roi)}. Unused seats are paid for every month, so they count as spend throughout.`;
+
+  const el = document.getElementById('chart-trend');
+  const width = Math.max(280, el.clientWidth || 320);
+  const height = 230;
+  const pad = { top: 14, right: 16, bottom: 46, left: 58 };
+  const plotW = width - pad.left - pad.right;
+  const plotH = height - pad.top - pad.bottom;
+  const max = Math.max(...points.map((p) => Math.max(p.value, p.cost))) * 1.1 || 1;
+  // Round the axis top to a tidy step so the gridline labels are readable numbers.
+  const step = 10 ** Math.floor(Math.log10(max / 4));
+  const tick = [1, 2, 2.5, 5, 10].map((k) => k * step).find((s) => max / s <= 5);
+  const top = Math.ceil(max / tick) * tick;
+  // Inset the first and last months so their ROI labels clear the axis labels and the edge.
+  const inset = 26;
+  const x = (i) => pad.left + inset + (points.length === 1 ? (plotW - 2 * inset) / 2 : (i / (points.length - 1)) * (plotW - 2 * inset));
+  const y = (v) => pad.top + plotH - (v / top) * plotH;
+  const compact = (v) => (v >= 1000 ? `$${num(v / 1000)}k` : money(v));
+
+  let grid = '';
+  for (let v = 0; v <= top + 1e-9; v += tick) {
+    grid += `<line x1="${pad.left}" x2="${width - pad.right}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)"></line>
+      <text class="v" x="${pad.left - 8}" y="${y(v) + 4}" text-anchor="end">${compact(v)}</text>`;
+  }
+  const line = (key, color, dash = '') =>
+    `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round"${dash} points="${points.map((p, i) => `${x(i)},${y(p[key])}`).join(' ')}"></polyline>` +
+    points.map((p, i) => `<circle cx="${x(i)}" cy="${y(p[key])}" r="3.5" fill="${color}"><title>${monthName(p.month)}: ${money(p[key])}</title></circle>`).join('');
+  const labels = points.map((p, i) => `
+    <text x="${x(i)}" y="${height - pad.bottom + 18}" text-anchor="middle">${short(p.month)}</text>
+    <text class="roi ${roiClass(p.roi)}" x="${x(i)}" y="${height - pad.bottom + 34}" text-anchor="middle">${pct(p.roi)}</text>`).join('');
+  const summary = `Estimated value vs AI spend by month: ${points.map((p) => `${short(p.month)} ${money(p.value)} value, ${money(p.cost)} spend, ROI ${pct(p.roi)}`).join('; ')}.`;
+
+  el.innerHTML = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(summary)}">
+    ${grid}
+    <text class="v" x="${pad.left - 8}" y="${height - pad.bottom + 34}" text-anchor="end">ROI</text>
+    ${line('cost', 'var(--amber)', ' stroke-dasharray="6 4"')}
+    ${line('value', 'var(--green)')}
+    ${labels}
+  </svg>`;
+}
+
 function renderRecommendations(r) {
   document.getElementById('recs').innerHTML = buildRecommendations(r)
     .map((rec) => `<li style="--accent:${rec.color}"><span class="kind">${rec.kind}</span><p>${rec.html}</p></li>`)
@@ -538,6 +605,7 @@ function render() {
   const r = calculate(DATA, assumptions);
   renderHeadline(r);
   renderRecommendations(r);
+  renderTrend();
   renderTeams(r);
   renderWaste(r);
   renderTools(r);
