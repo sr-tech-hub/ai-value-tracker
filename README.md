@@ -10,6 +10,7 @@ Companies are paying for AI tools like Claude, ChatGPT and Copilot, but most can
 - **Waste:** seats unused for 30+ days, and what reclaiming them would save
 - **Time saved:** estimated hours saved per team, per tool
 - **ROI:** estimated value of time saved vs what the licences cost
+- **Trend:** how value and ROI moved month by month over the last six months
 
 ## Result
 With the default assumptions ($50/hour, 4–10 minutes saved per task), the sample data shows:
@@ -17,6 +18,7 @@ With the default assumptions ($50/hour, 4–10 minutes saved per task), the samp
 - **$6,595/month** spent on 239 AI seats returns an estimated **$30,069/month** in time saved: a **356% ROI** overall.
 - **31 seats unused for 30+ days**, costing **$870/month ($10,440/year)**. The biggest block is 13 unused ChatGPT seats in Sales.
 - **Support gets about 20× more value per seat than Sales** ($269 vs $13 a month). Sales is the only team losing money (ROI −57%), and it stays negative even after reclaiming its unused seats, so the fix is training, not just cutting seats.
+- **Trend:** estimated value grew 22% from May to October while spend stayed flat, so ROI climbed from 274% to 356% as people got used to the tools.
 - **Overlap:** 8 of 13 active Gemini users also use ChatGPT. Consolidating them saves $200/month.
 
 The data is synthetic; the method is real. Swap in a usage export from your AI vendors' admin consoles in the same format and the dashboard answers the same questions with real numbers.
@@ -25,7 +27,7 @@ The data is synthetic; the method is real. Swap in a usage export from your AI v
 
 ## How it works
 1. `scripts/generate-sample-data.js` creates six months of realistic usage data for a fictional 200-person company.
-2. `index.html` reads that data and calculates utilization, hours saved and ROI in one place, so every panel shows consistent numbers.
+2. `index.html` reads that data and calculates utilization, hours saved and ROI in one place, so every panel shows consistent numbers. The trend chart runs the same calculation once per month.
 3. The assumptions (hourly rate, minutes saved per task) are editable on the page, because they're estimates. Change them and every number updates.
 4. Recommendations come from simple, readable rules (for example, "3+ unused seats of one tool in one team → reclaim them"), so anyone can check why the tool suggests an action.
 
