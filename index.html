@@ -215,7 +215,7 @@
       <section class="panel" aria-labelledby="tools-h">
         <span class="tag-title" style="color:var(--cyan)">Compare</span>
         <h2 id="tools-h">By tool</h2>
-        <p class="lead">Seat prices are SAMPLE values, not real vendor pricing. Overlap = active users who also actively use another general assistant.</p>
+        <p class="lead">Seat prices are SAMPLE values, not real vendor pricing. Overlap = active users who also actively use <em>any</em> other general assistant. Recommendations name one specific pair of tools, so their counts can be lower.</p>
         <div class="table-scroll"><table id="tools-table"></table></div>
         <div class="chart-title">Cost per active user, per month</div>
         <div class="chart" id="chart-cost"></div>
@@ -523,7 +523,7 @@ function renderTools(r) {
   document.getElementById('tools-table').innerHTML = `
     <thead><tr>
       <th scope="col">Tool</th><th scope="col">Price / seat</th><th scope="col">Paid</th><th scope="col">Active</th>
-      <th scope="col">Utilization</th><th scope="col">Overlap</th>
+      <th scope="col">Utilization</th><th scope="col">Overlap (any)</th>
     </tr></thead>
     <tbody>${tools.map((t) => `
       <tr>
@@ -532,7 +532,7 @@ function renderTools(r) {
         <td>${t.paid}</td>
         <td>${t.active}</td>
         <td class="${t.utilization < 0.75 ? 'warn' : ''}">${pct(t.utilization)}</td>
-        <td>${t.category === 'assistant' && t.active ? `<span class="${t.overlapPeople / t.active >= OVERLAP_SHARE_TO_RETIRE ? 'warn' : ''}">${pct(t.overlapPeople / t.active)}</span>` : '<span class="small">n/a</span>'}</td>
+        <td>${t.category === 'assistant' && t.active ? `<span class="${t.overlapPeople / t.active >= OVERLAP_SHARE_TO_RETIRE ? 'warn' : ''}">${pct(t.overlapPeople / t.active)}</span> <span class="small">${t.overlapPeople} of ${t.active}</span>` : '<span class="small">n/a</span>'}</td>
       </tr>`).join('')}
     </tbody>`;
 
