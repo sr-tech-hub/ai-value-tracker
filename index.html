@@ -119,6 +119,13 @@
   }
   footer { color: var(--muted); font-size: 13px; margin-top: 24px; text-align: center; }
 
+  .source { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right; }
+  @media (max-width: 640px) { .source { align-items: flex-start; text-align: left; } }
+  .source-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .source a { color: var(--cyan); }
+  .sample-note.custom { border-color: color-mix(in srgb, var(--cyan) 45%, transparent); background: color-mix(in srgb, var(--cyan) 10%, transparent); color: var(--cyan); }
+  .file-status { border: 1px solid color-mix(in srgb, var(--red) 50%, transparent); background: color-mix(in srgb, var(--red) 10%, transparent); border-radius: var(--radius); padding: 12px 16px; margin-bottom: 16px; }
+  .file-status ul { margin: 6px 0 0; padding-left: 20px; }
   .load-error { display: none; max-width: 620px; margin: 60px auto; }
   .load-error code { background: var(--panel-2); padding: 2px 6px; border-radius: 4px; }
 </style>
@@ -131,13 +138,24 @@
       <h1>Is our AI spend paying off?</h1>
       <p class="sub" id="subtitle">Loading…</p>
     </div>
-    <div class="sample-note">Built with sample data to protect confidentiality.</div>
+    <div class="source">
+      <div class="sample-note" id="source-note">Built with sample data to protect confidentiality.</div>
+      <div class="source-actions">
+        <button type="button" class="reset" data-action="pick-file">Load your own file</button>
+        <button type="button" class="reset" id="use-sample" hidden>Back to sample data</button>
+      </div>
+      <div class="small">Read in this browser only, never uploaded. <a href="data/sample-usage.json" download>See the format</a></div>
+    </div>
+    <input type="file" id="file-input" accept=".json,application/json" hidden>
   </header>
+
+  <div class="file-status" id="file-status" role="alert" hidden></div>
 
   <div class="panel load-error" id="load-error" role="alert">
     <h2>The usage data couldn't load</h2>
     <p>Browsers block a page opened straight from your files from reading <code>data/sample-usage.json</code>.</p>
-    <p>View the live demo instead, or serve this folder locally, for example with <code>python3 -m http.server</code>, then open the address it prints.</p>
+    <p>Pick that file yourself instead, view the live demo, or serve this folder locally, for example with <code>python3 -m http.server</code>, then open the address it prints.</p>
+    <div class="actions"><button type="button" class="reset" data-action="pick-file">Choose a data file</button></div>
   </div>
 
   <main id="app" hidden>
@@ -645,14 +663,114 @@ function fillAssumptionInputs() {
 // ---------------------------------------------------------------------------
 // Start-up
 // ---------------------------------------------------------------------------
-function init(data) {
+const SAMPLE_URL = 'data/sample-usage.json';
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
+let sampleData = null;
+
+// Checks a file has the shape calculate() relies on, and returns every problem
+// in plain English rather than stopping at the first, so one fix-up pass is enough.
+function validateData(d) {
+  const errors = [];
+  const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+  const isMonth = (v) => typeof v === 'string' && /^\d{4}-\d{2}$/.test(v);
+  if (!d || typeof d !== 'object' || Array.isArray(d)) return ['The file is not a JSON object.'];
+  const meta = d.meta ?? {};
+  if (!isDate(meta.asOf)) errors.push('meta.asOf must be a date like "2026-10-31".');
+  if (!Array.isArray(meta.months) || !meta.months.length || !meta.months.every(isMonth)) errors.push('meta.months must be a list of months like "2026-10", oldest first.');
+  if (!Array.isArray(d.teams) || !d.teams.length) errors.push('teams must be a non-empty list.');
+  if (!Array.isArray(d.tools) || !d.tools.length) errors.push('tools must be a non-empty list.');
+  if (!Array.isArray(d.seats) || !d.seats.length) errors.push('seats must be a non-empty list.');
+  // Seat checks need the three lists; without them, stop at what's already found.
+  if (![d.teams, d.tools, d.seats].every((list) => Array.isArray(list) && list.length)) return errors;
+
+  const teamNames = new Set();
+  d.teams.forEach((t, i) => {
+    if (typeof t?.name !== 'string' || !t.name) errors.push(`teams[${i}] needs a name.`);
+    else teamNames.add(t.name);
+  });
+  const toolIds = new Set();
+  d.tools.forEach((t, i) => {
+    if (typeof t?.id !== 'string' || typeof t?.name !== 'string') errors.push(`tools[${i}] needs an id and a name.`);
+    else toolIds.add(t.id);
+    if (!(Number.isFinite(t?.monthlyPricePerSeat) && t.monthlyPricePerSeat >= 0)) errors.push(`tools[${i}] needs a monthlyPricePerSeat number.`);
+    if (!['assistant', 'coding'].includes(t?.category)) errors.push(`tools[${i}] category must be "assistant" or "coding".`);
+  });
+
+  const MAX_SEAT_ERRORS = 5;
+  let seatErrors = 0;
+  const seatError = (msg) => { if (seatErrors++ < MAX_SEAT_ERRORS) errors.push(msg); };
+  d.seats.forEach((s, i) => {
+    const id = s?.seatId ?? `seats[${i}]`;
+    if (typeof s?.seatId !== 'string' || typeof s?.employeeId !== 'string') seatError(`${id} needs a seatId and an employeeId.`);
+    if (!teamNames.has(s?.team)) seatError(`${id} has team "${s?.team}", which isn't in the teams list.`);
+    if (!toolIds.has(s?.tool)) seatError(`${id} has tool "${s?.tool}", which isn't in the tools list.`);
+    if (s?.lastActive !== null && !isDate(s?.lastActive)) seatError(`${id} lastActive must be a date or null (never used).`);
+    if (!Array.isArray(s?.usage)) seatError(`${id} needs a usage list (it can be empty).`);
+    else if (!s.usage.every((u) => isMonth(u?.month) && u.tasks && typeof u.tasks === 'object' && Object.values(u.tasks).every((n) => Number.isFinite(n) && n >= 0))) {
+      seatError(`${id} usage entries need a month and task counts that are numbers.`);
+    }
+  });
+  if (seatErrors > MAX_SEAT_ERRORS) errors.push(`…and ${seatErrors - MAX_SEAT_ERRORS} more seat problems.`);
+  return errors;
+}
+
+function showFileStatus(html) {
+  const box = document.getElementById('file-status');
+  box.innerHTML = html;
+  box.hidden = !html;
+}
+
+// Swaps in a new dataset and redraws. `fileName` is null for the bundled sample.
+function loadData(data, fileName) {
   DATA = data;
-  const company = data.meta.company;
-  const latest = data.meta.months[data.meta.months.length - 1];
-  document.getElementById('subtitle').textContent = `${company} · as of ${longDate(data.meta.asOf)}`;
+  const meta = data.meta;
+  const latest = meta.months[meta.months.length - 1];
+  const company = meta.company || 'Your company';
+  document.getElementById('subtitle').textContent = `${company} · as of ${longDate(meta.asOf)}`;
   document.getElementById('measure-lead').textContent =
-    `Hours saved and value use the latest month of data (${monthName(latest)}). "Last 30 days" is counted back from ${longDate(data.meta.asOf)}. ${data.meta.pricingNote}`;
-  document.getElementById('footer').textContent = data.meta.note;
+    `Hours saved and value use the latest month of data (${monthName(latest)}); the trend uses each month. "Last 30 days" is counted back from ${longDate(meta.asOf)}. ${meta.pricingNote ?? ''}`;
+
+  const note = document.getElementById('source-note');
+  note.classList.toggle('custom', Boolean(fileName));
+  note.textContent = fileName ? `Your data: ${fileName}` : 'Built with sample data to protect confidentiality.';
+  document.getElementById('footer').textContent = fileName
+    ? `Showing ${fileName}. It was read in this browser and never uploaded; reloading the page goes back to the sample.`
+    : meta.note;
+  document.getElementById('use-sample').hidden = !fileName || !sampleData;
+
+  document.getElementById('load-error').style.display = 'none';
+  document.getElementById('app').hidden = false;
+  render();
+}
+
+function readUserFile(file) {
+  if (!file) return;
+  const fail = (lines) => showFileStatus(
+    `<strong>${esc(file.name)} wasn't loaded.</strong> The dashboard is unchanged.<ul>${lines.map((l) => `<li>${esc(l)}</li>`).join('')}</ul>`);
+  if (file.size > MAX_FILE_BYTES) return fail([`The file is ${num(file.size / 1048576)} MB; the limit is 20 MB.`]);
+  file.text().then((text) => {
+    let data;
+    try { data = JSON.parse(text); } catch (err) { return fail([`It isn't valid JSON (${err.message}).`]); }
+    const errors = validateData(data);
+    if (errors.length) return fail(errors);
+    showFileStatus('');
+    loadData(data, file.name);
+  }, () => fail(['The browser could not read the file.']));
+}
+
+function setup() {
+  const fileInput = document.getElementById('file-input');
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('[data-action="pick-file"]')) fileInput.click();
+  });
+  fileInput.addEventListener('change', () => {
+    readUserFile(fileInput.files[0]);
+    fileInput.value = ''; // so choosing the same file again still fires "change"
+  });
+  document.getElementById('use-sample').addEventListener('click', () => {
+    showFileStatus('');
+    loadData(sampleData, null);
+  });
 
   buildAssumptionsForm();
   document.getElementById('reset').addEventListener('click', () => {
@@ -668,25 +786,27 @@ function init(data) {
     render();
   });
 
-  document.getElementById('app').hidden = false;
-  render();
-
   let pending = false;
   window.addEventListener('resize', () => {
-    if (pending) return;
+    if (pending || !DATA) return;
     pending = true;
     requestAnimationFrame(() => { pending = false; render(); });
   });
 }
 
-fetch('data/sample-usage.json')
+setup();
+fetch(SAMPLE_URL)
   .then((res) => {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   })
-  .then(init)
+  .then((data) => {
+    sampleData = data;
+    if (!DATA) loadData(data, null); // don't overwrite a file the user picked while this was loading
+  })
   .catch((err) => {
-    console.error('Could not load data/sample-usage.json:', err);
+    console.error(`Could not load ${SAMPLE_URL}:`, err);
+    if (DATA) return;
     document.getElementById('subtitle').textContent = 'Data unavailable';
     document.getElementById('load-error').style.display = 'block';
   });

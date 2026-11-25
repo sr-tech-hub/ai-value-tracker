@@ -21,7 +21,7 @@ With the default assumptions ($50/hour, 4–10 minutes saved per task), the samp
 - **Trend:** estimated value grew 22% from May to October while spend stayed flat, so ROI climbed from 274% to 356% as people got used to the tools.
 - **Overlap:** 8 of 13 active Gemini users also use ChatGPT. Consolidating them saves $200/month.
 
-The data is synthetic; the method is real. Swap in a usage export from your AI vendors' admin consoles in the same format and the dashboard answers the same questions with real numbers.
+The data is synthetic; the method is real. Click **Load your own file** on the dashboard to swap in a usage export from your AI vendors' admin consoles, in the same format as [`data/sample-usage.json`](data/sample-usage.json), and it answers the same questions with real numbers. The file is read in your browser and never uploaded. If it has a problem, the page lists what to fix and leaves the current data in place.
 
 ![Dashboard screenshot](docs/screenshot.png)
 
@@ -33,7 +33,7 @@ The data is synthetic; the method is real. Swap in a usage export from your AI v
 
 ## How to run it
 1. Open the live demo (link below), or download/clone this repository.
-2. To run it locally, start a small web server in the project folder with `python3 -m http.server`, then open http://localhost:8000. Double-clicking `index.html` won't work: browsers block a page opened from your files from reading the data file.
+2. To run it locally, start a small web server in the project folder with `python3 -m http.server`, then open http://localhost:8000. If you double-click `index.html` instead, the browser blocks it from reading the data file; the page then offers a button to choose `data/sample-usage.json` yourself.
 3. Optional: regenerate the data with `node scripts/generate-sample-data.js`. It uses a fixed seed, so you get the same numbers every time.
 
 Live demo: https://sr-tech-hub.github.io/ai-value-tracker/
