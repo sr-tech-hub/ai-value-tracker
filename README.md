@@ -41,8 +41,8 @@ Live demo: https://sr-tech-hub.github.io/ai-value-tracker/
 ## Why I built it
 In my IT role at a ~200-person company I managed AI tool access and usage (Claude, OpenAI). I saw first-hand that teams were encouraged to use AI but nobody could show its value. This project is how I'd answer that question.
 
-## Part of a set
-Three small tools covering the life of an AI tool at a company:
+## Part of the AI Adoption Toolkit
+Three small tools covering the life of an AI tool at a company, linked by a shared menu bar:
 - **[AI Tool Risk Triage](https://sr-tech-hub.github.io/ai-tool-risk-triage/)** ([code](https://github.com/sr-tech-hub/ai-tool-risk-triage)): should we approve it?
 - **[AI Rollout Planner](https://sr-tech-hub.github.io/ai-rollout-planner/)** ([code](https://github.com/sr-tech-hub/ai-rollout-planner)): how do we roll it out?
 - **AI Value Tracker** (this one): is it paying off?

@@ -137,12 +137,14 @@
   .suite .step { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
   .suite a[aria-current="page"] .step { color: var(--cyan); }
   .suite .name { display: block; font-size: 14px; font-weight: 600; }
+  .suite .kit { grid-column: 1 / -1; padding: 2px 12px 0; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--cyan); }
   @media (max-width: 480px) { .suite a { padding: 6px 8px; } .suite .step { letter-spacing: .04em; } .suite .name { font-size: 13px; } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <nav class="suite" aria-label="The three linked AI tools">
+  <nav class="suite" aria-label="AI Adoption Toolkit">
+    <span class="kit" aria-hidden="true">AI Adoption Toolkit</span>
     <a href="https://sr-tech-hub.github.io/ai-tool-risk-triage/"><span class="step">1 · Approve</span><span class="name">Risk Triage</span></a>
     <a href="https://sr-tech-hub.github.io/ai-rollout-planner/"><span class="step">2 · Roll out</span><span class="name">Rollout Planner</span></a>
     <a href="./" aria-current="page"><span class="step">3 · Measure</span><span class="name">Value Tracker</span></a>
